@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>增强型封面和歌词API测试</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            min-height: 100vh;
+        }
+        .test-card {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            backdrop-filter: blur(10px);
+        }
+        .test-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #764ba2;
+        }
+        .result {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 10px;
+            border-radius: 5px;
+            margin-top: 10px;
+            font-family: monospace;
+            white-space: pre-wrap;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .cover-preview {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: 10px;
+        }
+        .cover-item {
+            text-align: center;
+        }
+        .cover-item img {
+            width: 120px;
+            height: 120px;
+            object-fit: cover;
+            border-radius: 8px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+        }
+        .cover-item p {
+            margin: 5px 0;
+            font-size: 12px;
+        }
+        input {
+            padding: 8px;
+            margin: 5px;
+            border: none;
+            border-radius: 4px;
+            background: rgba(255, 255, 255, 0.9);
+            color: #333;
+        }
+        .lyrics-preview {
+            background: rgba(0, 0, 0, 0.2);
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 10px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        .lyric-line {
+            padding: 2px 0;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🎵 增强型封面和歌词API测试</h1>
+
+    <div class="test-grid">
+        <!-- 封面测试 -->
+        <div class="test-card">
+            <h3>🖼️ 多源封面搜索测试</h3>
+            <div>
+                <input type="text" id="coverArtist" placeholder="艺术家" value="陶喆">
+                <input type="text" id="coverAlbum" placeholder="专辑" value="再见你好吗">
+                <input type="text" id="coverSong" placeholder="歌曲（可选）" value="那个女孩">
+            </div>
+            <button onclick="testMultiCoverSearch()">搜索多源封面</button>
+            <button onclick="testCurrentSongCover()">获取当前歌曲封面</button>
+            <div id="coverResult" class="result"></div>
+            <div id="coverPreview" class="cover-preview"></div>
+        </div>
+
+        <!-- 歌词测试 -->
+        <div class="test-card">
+            <h3>📝 多源歌词搜索测试</h3>
+            <div>
+                <input type="text" id="lyricArtist" placeholder="艺术家" value="陶喆">
+                <input type="text" id="lyricSong" placeholder="歌曲" value="那个女孩">
+            </div>
+            <button onclick="testMultiLyricSearch()">搜索多源歌词</button>
+            <button onclick="testEnhancedLyrics()">获取增强版歌词</button>
+            <div id="lyricResult" class="result"></div>
+        </div>
+    </div>
+
+    <!-- API源状态 -->
+    <div class="test-card">
+        <h3>🔗 API源状态测试</h3>
+        <button onclick="testMetingAPIs()">测试Meting API状态</button>
+        <button onclick="testLastFmAPI()">测试Last.fm API</button>
+        <button onclick="getCacheInfo()">查看缓存信息</button>
+        <div id="apiStatusResult" class="result"></div>
+    </div>
+
+    <!-- 当前播放状态 -->
+    <div class="test-card">
+        <h3>🎮 当前播放状态</h3>
+        <button onclick="getCurrentPlayingInfo()">获取当前播放信息</button>
+        <button onclick="testLyricComparison()">比较歌词质量</button>
+        <div id="currentInfoResult" class="result"></div>
+    </div>
+
+    <script>
+        const API_BASE = '/api';
+
+        async function makeRequest(url, options = {}) {
+            try {
+                const response = await fetch(url, {
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    ...options
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                return await response.json();
+            } catch (error) {
+                throw error;
+            }
+        }
+
+        function displayResult(elementId, result) {
+            const element = document.getElementById(elementId);
+            element.textContent = JSON.stringify(result, null, 2);
+        }
+
+        // 测试多源封面搜索
+        async function testMultiCoverSearch() {
+            const artist = document.getElementById('coverArtist').value;
+            const album = document.getElementById('coverAlbum').value;
+            const song = document.getElementById('coverSong').value;
+
+            displayResult('coverResult', { status: '正在搜索多个封面源...' });
+
+            const results = [];
+            const sources = [
+                { name: 'Meting-网易云', url: `https://api.injahow.cn/meting/?server=netease&type=search&id=${encodeURIComponent(artist + ' ' + album)}` },
+                { name: 'Meting-QQ音乐', url: `https://api.injahow.cn/meting/?server=qq&type=search&id=${encodeURIComponent(artist + ' ' + album)}` },
+                { name: 'Last.fm', url: `https://ws.audioscrobbler.com/2.0/?method=album.getinfo&api_key=b25b959554ed76058ac220b7b2e0a026&artist=${encodeURIComponent(artist)}&album=${encodeURIComponent(album)}&format=json` }
+            ];
+
+            const coverPreview = document.getElementById('coverPreview');
+            coverPreview.innerHTML = '';
+
+            for (const source of sources) {
+                try {
+                    const response = await fetch(source.url);
+                    const data = await response.json();
+
+                    let coverUrl = null;
+                    if (source.name.includes('Meting')) {
+                        if (Array.isArray(data) && data.length > 0) {
+                            // 获取歌曲详情
+                            const detailUrl = `${source.url.split('&type=search')[0]}&type=song&id=${data[0].id}`;
+                            const detailResponse = await fetch(detailUrl);
+                            const detailData = await detailResponse.json();
+                            if (Array.isArray(detailData) && detailData.length > 0) {
+                                coverUrl = detailData[0].pic;
+                            }
+                        }
+                    } else if (source.name === 'Last.fm') {
+                        const images = data.album?.image;
+                        if (images && Array.isArray(images)) {
+                            const largeImage = images.find(img => img.size === 'extralarge');
+                            coverUrl = largeImage ? largeImage['#text'] : images[images.length - 1]['#text'];
+                        }
+                    }
+
+                    results.push({
+                        source: source.name,
+                        success: !!coverUrl,
+                        coverUrl: coverUrl,
+                        rawData: data
+                    });
+
+                    // 显示封面预览
+                    if (coverUrl) {
+                        const coverItem = document.createElement('div');
+                        coverItem.className = 'cover-item';
+                        coverItem.innerHTML = `
+                            <img src="${coverUrl}" alt="${source.name}" onerror="this.style.display='none'">
+                            <p>${source.name}</p>
+                        `;
+                        coverPreview.appendChild(coverItem);
+                    }
+                } catch (error) {
+                    results.push({
+                        source: source.name,
+                        success: false,
+                        error: error.message
+                    });
+                }
+            }
+
+            displayResult('coverResult', results);
+        }
+
+        // 获取当前歌曲封面
+        async function testCurrentSongCover() {
+            try {
+                const status = await makeRequest(API_BASE + '/status');
+                if (status.singer && status.albumName) {
+                    document.getElementById('coverArtist').value = status.singer;
+                    document.getElementById('coverAlbum').value = status.albumName;
+                    document.getElementById('coverSong').value = status.name;
+                    await testMultiCoverSearch();
+                } else {
+                    displayResult('coverResult', { error: '无法获取当前播放歌曲信息' });
+                }
+            } catch (error) {
+                displayResult('coverResult', { error: error.message });
+            }
+        }
+
+        // 测试多源歌词搜索
+        async function testMultiLyricSearch() {
+            const artist = document.getElementById('lyricArtist').value;
+            const song = document.getElementById('lyricSong').value;
+
+            displayResult('lyricResult', { status: '正在搜索多个歌词源...' });
+
+            const results = [];
+            const platforms = ['netease', 'qq', 'kugou', 'kuwo'];
+
+            for (const platform of platforms) {
+                try {
+                    const searchUrl = `https://api.injahow.cn/meting/?server=${platform}&type=search&id=${encodeURIComponent(artist + ' ' + song)}`;
+                    const searchResponse = await fetch(searchUrl);
+                    const searchData = await searchResponse.json();
+
+                    if (Array.isArray(searchData) && searchData.length > 0) {
+                        const lyricUrl = `https://api.injahow.cn/meting/?server=${platform}&type=lyric&id=${searchData[0].id}`;
+                        const lyricResponse = await fetch(lyricUrl);
+                        const lyricData = await lyricResponse.json();
+
+                        results.push({
+                            platform: platform,
+                            songInfo: searchData[0],
+                            lyrics: lyricData.lyric ? lyricData.lyric.split('\n').length : 0,
+                            hasLyrics: !!lyricData.lyric,
+                            preview: lyricData.lyric ? lyricData.lyric.split('\n').slice(0, 5).join('\n') : null
+                        });
+                    }
+                } catch (error) {
+                    results.push({
+                        platform: platform,
+                        error: error.message
+                    });
+                }
+            }
+
+            displayResult('lyricResult', results);
+        }
+
+        // 测试增强版歌词
+        async function testEnhancedLyrics() {
+            try {
+                const lyrics = await makeRequest(API_BASE + '/lyric');
+                displayResult('lyricResult', {
+                    source: '增强版歌词API',
+                    lyrics: lyrics,
+                    lyricsCount: lyrics.length
+                });
+            } catch (error) {
+                displayResult('lyricResult', { error: error.message });
+            }
+        }
+
+        // 测试Meting API状态
+        async function testMetingAPIs() {
+            const apis = [
+                'https://api.injahow.cn/meting',
+                'https://meting.qjqq.cn/api.php',
+                'https://api.mizore.cn/meting'
+            ];
+
+            const results = [];
+            for (const api of apis) {
+                try {
+                    const testUrl = `${api}/?server=netease&type=search&id=test`;
+                    const start = Date.now();
+                    const response = await fetch(testUrl);
+                    const responseTime = Date.now() - start;
+
+                    results.push({
+                        api: api,
+                        status: response.ok ? 'online' : 'error',
+                        responseTime: responseTime + 'ms',
+                        statusCode: response.status
+                    });
+                } catch (error) {
+                    results.push({
+                        api: api,
+                        status: 'offline',
+                        error: error.message
+                    });
+                }
+            }
+
+            displayResult('apiStatusResult', results);
+        }
+
+        // 测试Last.fm API
+        async function testLastFmAPI() {
+            try {
+                const testUrl = 'https://ws.audioscrobbler.com/2.0/?method=album.getinfo&api_key=b25b959554ed76058ac220b7b2e0a026&artist=test&album=test&format=json';
+                const start = Date.now();
+                const response = await fetch(testUrl);
+                const responseTime = Date.now() - start;
+                const data = await response.json();
+
+                displayResult('apiStatusResult', {
+                    api: 'Last.fm',
+                    status: response.ok ? 'online' : 'error',
+                    responseTime: responseTime + 'ms',
+                    testResponse: data
+                });
+            } catch (error) {
+                displayResult('apiStatusResult', {
+                    api: 'Last.fm',
+                    status: 'offline',
+                    error: error.message
+                });
+            }
+        }
+
+        // 获取缓存信息
+        async function getCacheInfo() {
+            displayResult('apiStatusResult', {
+                message: '缓存信息需要在开发控制台查看',
+                note: '请打开浏览器开发者工具的Console查看缓存详情'
+            });
+
+            console.log('=== 缓存信息 ===');
+            console.log('封面缓存:', localStorage.getItem('cover-cache'));
+            console.log('歌词缓存:', localStorage.getItem('lyric-cache'));
+        }
+
+        // 获取当前播放信息
+        async function getCurrentPlayingInfo() {
+            try {
+                const status = await makeRequest(API_BASE + '/status');
+                displayResult('currentInfoResult', {
+                    currentSong: status,
+                    suggestion: `可以用这些信息测试: ${status.singer} - ${status.name} (${status.albumName})`
+                });
+
+                // 自动填充测试框
+                if (status.singer) document.getElementById('coverArtist').value = status.singer;
+                if (status.albumName) document.getElementById('coverAlbum').value = status.albumName;
+                if (status.name) document.getElementById('coverSong').value = status.name;
+                if (status.singer) document.getElementById('lyricArtist').value = status.singer;
+                if (status.name) document.getElementById('lyricSong').value = status.name;
+            } catch (error) {
+                displayResult('currentInfoResult', { error: error.message });
+            }
+        }
+
+        // 比较歌词质量
+        async function testLyricComparison() {
+            try {
+                // 获取LX Music原始歌词
+                const lxLyrics = await makeRequest(API_BASE + '/lyric');
+
+                // 获取当前歌曲信息
+                const status = await makeRequest(API_BASE + '/status');
+
+                if (status.singer && status.name) {
+                    // 获取外部歌词进行比较
+                    const artist = status.singer;
+                    const song = status.name;
+
+                    displayResult('currentInfoResult', {
+                        lxMusicLyrics: {
+                            count: lxLyrics.length,
+                            preview: lxLyrics.slice(0, 3)
+                        },
+                        message: '歌词质量对比功能需要在主应用中查看控制台输出'
+                    });
+                } else {
+                    displayResult('currentInfoResult', { error: '无法获取当前歌曲信息进行比较' });
+                }
+            } catch (error) {
+                displayResult('currentInfoResult', { error: error.message });
+            }
+        }
+
+        // 页面加载时获取当前播放信息
+        window.onload = () => {
+            getCurrentPlayingInfo();
+        };
+    </script>
+</body>
+</html>

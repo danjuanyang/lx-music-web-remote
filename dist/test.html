@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LX Music API 测试</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            min-height: 100vh;
+        }
+        .test-card {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            backdrop-filter: blur(10px);
+        }
+        button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #764ba2;
+        }
+        .result {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 10px;
+            border-radius: 5px;
+            margin-top: 10px;
+            font-family: monospace;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+    <h1>LX Music API 连接测试</h1>
+
+    <div class="test-card">
+        <h3>连接测试</h3>
+        <button onclick="testConnection()">测试连接到 LX Music</button>
+        <div id="connectionResult" class="result"></div>
+    </div>
+
+    <div class="test-card">
+        <h3>播放控制测试</h3>
+        <button onclick="testPlayPause()">播放/暂停</button>
+        <button onclick="testNext()">下一曲</button>
+        <button onclick="testPrevious()">上一曲</button>
+        <div id="controlResult" class="result"></div>
+    </div>
+
+    <div class="test-card">
+        <h3>获取状态测试</h3>
+        <button onclick="getCurrentStatus()">获取当前状态</button>
+        <button onclick="getLyrics()">获取歌词</button>
+        <div id="statusResult" class="result"></div>
+    </div>
+
+    <script>
+        const API_BASE = '/api';
+
+        async function makeRequest(url, options = {}) {
+            try {
+                const response = await fetch(API_BASE + url, {
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    ...options
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                return await response.json();
+            } catch (error) {
+                throw error;
+            }
+        }
+
+        function displayResult(elementId, result) {
+            const element = document.getElementById(elementId);
+            element.textContent = JSON.stringify(result, null, 2);
+        }
+
+        async function testConnection() {
+            const resultDiv = document.getElementById('connectionResult');
+            resultDiv.textContent = '正在连接...';
+
+            try {
+                const result = await makeRequest('/status');
+                displayResult('connectionResult', {
+                    success: true,
+                    message: '连接成功！',
+                    data: result
+                });
+            } catch (error) {
+                displayResult('connectionResult', {
+                    success: false,
+                    message: '连接失败',
+                    error: error.message,
+                    tips: [
+                        '1. 确保 LX Music 桌面版已启动',
+                        '2. 在设置中开启 "开放API" 功能',
+                        '3. 确认端口号为 9527',
+                        '4. 检查防火墙设置'
+                    ]
+                });
+            }
+        }
+
+        async function testPlayPause() {
+            try {
+                // 先获取当前状态
+                const status = await makeRequest('/status');
+                let result;
+                if (status.status === 'playing') {
+                    result = await makeRequest('/pause', { method: 'POST' });
+                } else {
+                    result = await makeRequest('/play', { method: 'POST' });
+                }
+                displayResult('controlResult', { action: 'play-pause', result, currentStatus: status.status });
+            } catch (error) {
+                displayResult('controlResult', { action: 'play-pause', error: error.message });
+            }
+        }
+
+        async function testNext() {
+            try {
+                const result = await makeRequest('/skip-next', { method: 'POST' });
+                displayResult('controlResult', { action: 'next', result });
+            } catch (error) {
+                displayResult('controlResult', { action: 'next', error: error.message });
+            }
+        }
+
+        async function testPrevious() {
+            try {
+                const result = await makeRequest('/skip-prev', { method: 'POST' });
+                displayResult('controlResult', { action: 'previous', result });
+            } catch (error) {
+                displayResult('controlResult', { action: 'previous', error: error.message });
+            }
+        }
+
+        async function getCurrentStatus() {
+            try {
+                const result = await makeRequest('/status');
+                displayResult('statusResult', { action: 'current-status', result });
+            } catch (error) {
+                displayResult('statusResult', { action: 'current-status', error: error.message });
+            }
+        }
+
+        async function getLyrics() {
+            try {
+                const result = await makeRequest('/lyric');
+                displayResult('statusResult', { action: 'lyrics', result });
+            } catch (error) {
+                displayResult('statusResult', { action: 'lyrics', error: error.message });
+            }
+        }
+
+        // 页面加载时自动测试连接
+        window.onload = () => {
+            testConnection();
+        };
+    </script>
+</body>
+</html>

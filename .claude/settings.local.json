@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:lxmusic.toside.cn)",
+      "Bash(head:*)",
+      "Bash(tail:*)",
+      "Bash(true:*)"
+    ]
+  }
+}
