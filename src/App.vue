@@ -75,7 +75,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, onUnmounted } from 'vue'
+import { ref, reactive, watch, onMounted, onUnmounted } from 'vue'
 import SongInfoComponent from '@/components/SongInfo.vue'
 import LyricsDisplay from '@/components/LyricsDisplay.vue'
 import PlayerControls from '@/components/PlayerControls.vue'
@@ -109,6 +109,63 @@ const lyricFont = ref('')
 const onFontChanged = (fontFamily: string) => {
   lyricFont.value = fontFamily
 }
+
+const defaultTitle = '洛雪web歌词浏览'
+
+// 更新浏览器标签标题
+const updateDocumentTitle = () => {
+  if (currentSong.name) {
+    const artist = currentSong.singer || '未知歌手'
+    document.title = `${currentSong.name} - ${artist}`
+  } else {
+    document.title = defaultTitle
+  }
+}
+
+// 将专辑封面设为 favicon
+let faviconEl: HTMLLinkElement | null = null
+const updateFavicon = (url: string) => {
+  if (!faviconEl) {
+    faviconEl = document.querySelector('link[rel="icon"]')
+  }
+  if (!faviconEl) return
+  if (url) {
+    // 用 canvas 将远程图片转为本地 dataURL 以兼容跨域
+    const img = new Image()
+    img.crossOrigin = 'anonymous'
+    img.onload = () => {
+      const canvas = document.createElement('canvas')
+      canvas.width = 64
+      canvas.height = 64
+      const ctx = canvas.getContext('2d')
+      if (!ctx) return
+      // 圆角裁剪
+      ctx.beginPath()
+      ctx.roundRect(0, 0, 64, 64, 12)
+      ctx.clip()
+      ctx.drawImage(img, 0, 0, 64, 64)
+      faviconEl!.type = 'image/png'
+      faviconEl!.href = canvas.toDataURL('image/png')
+    }
+    img.onerror = () => {
+      // 加载失败时保持原样
+    }
+    img.src = url
+  } else {
+    faviconEl.type = 'image/svg+xml'
+    faviconEl.href = '/music-icon.svg'
+  }
+}
+
+watch(
+  () => [currentSong.name, currentSong.singer],
+  () => updateDocumentTitle()
+)
+
+watch(
+  () => currentSong.pic,
+  (pic) => updateFavicon(pic || '')
+)
 
 // 防抖定时器：歌曲切换后延迟获取歌词和完整状态
 let songChangeTimer: number | null = null
