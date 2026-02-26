@@ -8,7 +8,12 @@ class SSEService {
   private listeners: Map<string, Function[]> = new Map()
 
   constructor() {
-    this.url = '/api/subscribe-player-status'
+    // 订阅所有需要的字段，包括 picUrl（默认不包含）
+    const fields = [
+      'status', 'name', 'singer', 'albumName',
+      'duration', 'progress', 'playbackRate', 'picUrl'
+    ]
+    this.url = '/api/subscribe-player-status?filter=' + fields.join(',')
   }
 
   setURL(url: string) {
@@ -40,50 +45,50 @@ class SSEService {
         this.eventSource.addEventListener('status', (event) => {
           try {
             const status = JSON.parse(event.data)
-            this.handleStatusChange(status)
+            this.handleMessage('player-state', {
+              isPlaying: status === 'playing',
+            })
           } catch (error) {
             console.error('解析状态数据失败:', error)
           }
         })
 
-        // 歌曲信息字段
+        // 歌曲名 → 表示切歌了
         this.eventSource.addEventListener('name', (event) => {
-          this.handleSongChange({ name: JSON.parse(event.data) })
+          const name = JSON.parse(event.data)
+          this.handleMessage('song-change', { name })
         })
 
         this.eventSource.addEventListener('singer', (event) => {
-          this.handleSongChange({ singer: JSON.parse(event.data) })
+          const singer = JSON.parse(event.data)
+          this.handleMessage('song-field', { singer })
         })
 
         this.eventSource.addEventListener('albumName', (event) => {
-          this.handleSongChange({ albumName: JSON.parse(event.data) })
+          const albumName = JSON.parse(event.data)
+          this.handleMessage('song-field', { albumName })
         })
 
         // 封面图
         this.eventSource.addEventListener('picUrl', (event) => {
           try {
             const picUrl = JSON.parse(event.data)
-            this.handleMessage('pic-update', picUrl)
+            this.handleMessage('song-field', { pic: picUrl })
           } catch (error) {
             console.error('解析封面数据失败:', error)
           }
         })
 
-        // 进度与时长
+        // 进度
         this.eventSource.addEventListener('progress', (event) => {
           const progress = JSON.parse(event.data)
           this.handleMessage('progress-update', { currentTime: progress, duration: null })
         })
 
+        // 时长
         this.eventSource.addEventListener('duration', (event) => {
           const duration = JSON.parse(event.data)
           this.handleMessage('progress-update', { currentTime: null, duration })
-        })
-
-        // 歌词 (SSE 推送完整 LRC 文本)
-        this.eventSource.addEventListener('lyric', (event) => {
-          const lyricText = JSON.parse(event.data)
-          this.parseLyricsAndNotify(lyricText)
         })
 
       } catch (error) {
@@ -115,80 +120,6 @@ class SSEService {
         listeners.splice(index, 1)
       }
     }
-  }
-
-  private handleStatusChange(status: any) {
-    this.handleMessage('player-state', {
-      isPlaying: status === 'playing',
-    })
-  }
-
-  private handleSongChange(songData: any) {
-    this.handleMessage('song-change', songData)
-  }
-
-  /**
-   * 解析 LRC 歌词并通知。
-   * 支持多种常见 LRC 时间戳格式:
-   *   [02:30.50]   -> 2位分:2位秒.2位百分秒
-   *   [02:30.500]  -> 2位分:2位秒.3位毫秒
-   *   [02:30]      -> 2位分:2位秒 (无毫秒)
-   *   [2:30.50]    -> 1位分:2位秒.2位百分秒
-   *   [02:30.5]    -> 2位分:2位秒.1位十分秒
-   * 同一行多时间戳: [00:05.28][01:10.50]歌词
-   */
-  private parseLyricsAndNotify(lyricText: string) {
-    const lyrics: Array<{ time: number; text: string }> = []
-
-    if (lyricText) {
-      const lines = lyricText.split('\n')
-      // 匹配一个或多个时间标签 + 文本
-      const timeTagRe = /\[(\d{1,2}):(\d{2})(?:\.(\d{1,3}))?\]/g
-      const lineRe = /^((?:\[\d{1,2}:\d{2}(?:\.\d{1,3})?\])+)(.*)/
-
-      for (const rawLine of lines) {
-        const trimmed = rawLine.trim()
-        if (!trimmed) continue
-
-        const lineMatch = trimmed.match(lineRe)
-        if (!lineMatch) continue
-
-        const timeTagStr = lineMatch[1]
-        const text = lineMatch[2].trim()
-
-        // 跳过纯元数据行（如 [ti:xxx]、[ar:xxx]）
-        if (!text) continue
-
-        // 提取所有时间标签
-        let tagMatch: RegExpExecArray | null
-        timeTagRe.lastIndex = 0
-        while ((tagMatch = timeTagRe.exec(timeTagStr)) !== null) {
-          const minutes = parseInt(tagMatch[1])
-          const seconds = parseInt(tagMatch[2])
-          const subStr = tagMatch[3] || '0'
-
-          let subSeconds: number
-          if (subStr.length === 3) {
-            // 毫秒: 500 -> 0.5s
-            subSeconds = parseInt(subStr) / 1000
-          } else if (subStr.length === 2) {
-            // 百分秒: 50 -> 0.5s
-            subSeconds = parseInt(subStr) / 100
-          } else {
-            // 十分秒: 5 -> 0.5s
-            subSeconds = parseInt(subStr) / 10
-          }
-
-          const time = minutes * 60 + seconds + subSeconds
-          lyrics.push({ time, text })
-        }
-      }
-
-      // 按时间排序（多时间标签可能打乱顺序）
-      lyrics.sort((a, b) => a.time - b.time)
-    }
-
-    this.handleMessage('lyric-update', lyrics)
   }
 
   private handleMessage(type: string, data: any) {

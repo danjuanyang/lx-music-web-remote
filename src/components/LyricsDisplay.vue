@@ -1,9 +1,5 @@
 <template>
   <div class="lyrics-display" ref="lyricsWrapper">
-    <!-- Fade masks -->
-    <div class="lyrics-mask lyrics-mask-top"></div>
-    <div class="lyrics-mask lyrics-mask-bottom"></div>
-
     <div class="lyrics-scroll" ref="lyricsContainer">
       <div class="lyrics-spacer"></div>
 
@@ -11,11 +7,9 @@
         v-for="(line, index) in lyrics"
         :key="line.time + '-' + index"
         :ref="el => setLineRef(el, index)"
-        :class="['lyric-line', {
-          'lyric-active': index === currentLineIndex,
-          'lyric-near': Math.abs(index - currentLineIndex) === 1,
-          'lyric-far': Math.abs(index - currentLineIndex) > 1
-        }]"
+        class="lyric-line"
+        :class="{ 'lyric-active': index === currentLineIndex }"
+        :style="getLineStyle(index)"
         @click="$emit('seekTo', line.time)"
       >
         {{ line.text || '...' }}
@@ -43,9 +37,12 @@ import type { LyricLine } from '@/types'
 interface Props {
   lyrics: LyricLine[]
   currentTime: number
+  fontFamily?: string
 }
 
-const props = defineProps<Props>()
+const props = withDefaults(defineProps<Props>(), {
+  fontFamily: ''
+})
 defineEmits<{ seekTo: [time: number] }>()
 
 const lyricsWrapper = ref<HTMLDivElement>()
@@ -70,6 +67,49 @@ const currentLineIndex = computed(() => {
   }
   return index
 })
+
+/**
+ * Compute per-line style: blur + opacity based on distance from active line.
+ * distance 0 = active: sharp, full white
+ * distance 1: very slight blur
+ * distance 2+: increasing blur, decreasing opacity
+ */
+const getLineStyle = (index: number) => {
+  const dist = Math.abs(index - currentLineIndex.value)
+  let blur = 0
+  let opacity = 1
+
+  if (dist === 0) {
+    blur = 0
+    opacity = 1
+  } else if (dist === 1) {
+    blur = 0.5
+    opacity = 0.6
+  } else if (dist === 2) {
+    blur = 1.5
+    opacity = 0.4
+  } else if (dist === 3) {
+    blur = 2.5
+    opacity = 0.3
+  } else if (dist === 4) {
+    blur = 3.5
+    opacity = 0.22
+  } else {
+    blur = Math.min(dist * 1, 6)
+    opacity = Math.max(0.12, 0.3 - dist * 0.04)
+  }
+
+  const style: Record<string, string> = {
+    filter: `blur(${blur}px)`,
+    opacity: String(opacity),
+  }
+
+  if (props.fontFamily) {
+    style.fontFamily = props.fontFamily
+  }
+
+  return style
+}
 
 const scrollToActive = () => {
   const el = lineRefs.value.get(currentLineIndex.value)
@@ -107,26 +147,6 @@ onMounted(() => {
   min-height: 0;
 }
 
-/* Fade masks */
-.lyrics-mask {
-  position: absolute;
-  left: 0;
-  right: 0;
-  height: 100px;
-  z-index: 2;
-  pointer-events: none;
-}
-
-.lyrics-mask-top {
-  top: 0;
-  background: linear-gradient(to bottom, var(--mask-bg, rgba(12, 14, 15, 0.9)), transparent);
-}
-
-.lyrics-mask-bottom {
-  bottom: 0;
-  background: linear-gradient(to top, var(--mask-bg, rgba(12, 14, 15, 0.9)), transparent);
-}
-
 .lyrics-scroll {
   height: 100%;
   overflow-y: auto;
@@ -150,29 +170,23 @@ onMounted(() => {
   padding: 12px 0;
   font-size: 22px;
   line-height: 1.6;
-  color: rgba(255, 255, 255, 0.22);
-  text-align: left;
+  color: rgba(255, 255, 255, 0.75);
+  text-align: center;
   cursor: pointer;
-  transition: all 0.45s cubic-bezier(0.25, 0.1, 0.25, 1);
+  transition: all 0.5s cubic-bezier(0.25, 0.1, 0.25, 1);
   font-weight: 500;
+  will-change: filter, opacity;
 }
 
 .lyric-line:hover {
-  color: rgba(255, 255, 255, 0.4);
+  opacity: 0.9 !important;
+  filter: blur(0px) !important;
 }
 
 .lyric-line.lyric-active {
-  color: rgba(255, 255, 255, 0.95);
+  color: #fff;
   font-size: 30px;
   font-weight: 700;
-}
-
-.lyric-line.lyric-near {
-  color: rgba(255, 255, 255, 0.35);
-}
-
-.lyric-line.lyric-far {
-  color: rgba(255, 255, 255, 0.18);
 }
 
 /* ---------- No lyrics ---------- */
@@ -196,25 +210,21 @@ onMounted(() => {
 /* ---------- Mobile ---------- */
 @media (max-width: 768px) {
   .lyrics-scroll {
-    padding: 0 20px;
+    padding: 0 16px;
   }
 
   .lyric-line {
     font-size: 16px;
-    padding: 8px 0;
+    padding: 6px 0;
   }
 
   .lyric-line.lyric-active {
-    font-size: 22px;
-  }
-
-  .lyrics-mask {
-    height: 60px;
+    font-size: 20px;
   }
 
   .lyrics-spacer {
-    height: 40%;
-    min-height: 80px;
+    height: 30%;
+    min-height: 60px;
   }
 }
 </style>

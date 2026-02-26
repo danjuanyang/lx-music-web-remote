@@ -1,5 +1,29 @@
 <template>
   <div class="player-controls">
+    <!-- Playback buttons -->
+    <div class="control-buttons">
+      <button class="ctrl-btn" @click="previousSong" :disabled="loading" title="上一曲">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/>
+        </svg>
+      </button>
+
+      <button class="ctrl-btn ctrl-btn-play" @click="togglePlayPause" :disabled="loading" title="播放/暂停">
+        <svg v-if="!playerState.isPlaying" width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M8 5v14l11-7z"/>
+        </svg>
+        <svg v-else width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
+        </svg>
+      </button>
+
+      <button class="ctrl-btn" @click="nextSong" :disabled="loading" title="下一曲">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/>
+        </svg>
+      </button>
+    </div>
+
     <!-- Progress bar -->
     <div class="progress-section">
       <div
@@ -25,7 +49,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { apiService } from '@/services/api'
 import type { PlayerState } from '@/types'
 
@@ -39,6 +63,7 @@ const emit = defineEmits<{
   stateChanged: [state: Partial<PlayerState>]
 }>()
 
+const loading = ref(false)
 const progressBar = ref<HTMLDivElement>()
 const spectrumCanvas = ref<HTMLCanvasElement>()
 const isDragging = ref(false)
@@ -53,6 +78,37 @@ const progressPercentage = computed(() => {
 const remainingTime = computed(() => {
   return Math.max(0, props.playerState.duration - props.playerState.currentTime)
 })
+
+// ---------- Playback controls ----------
+const togglePlayPause = async () => {
+  loading.value = true
+  try {
+    const result = await apiService.togglePlayPause()
+    if (result.success) {
+      emit('stateChanged', { isPlaying: !props.playerState.isPlaying })
+    }
+  } finally {
+    loading.value = false
+  }
+}
+
+const nextSong = async () => {
+  loading.value = true
+  try {
+    await apiService.nextSong()
+  } finally {
+    loading.value = false
+  }
+}
+
+const previousSong = async () => {
+  loading.value = true
+  try {
+    await apiService.previousSong()
+  } finally {
+    loading.value = false
+  }
+}
 
 // ---------- Progress drag ----------
 const seekToPosition = (event: MouseEvent) => {
@@ -120,11 +176,9 @@ const drawSpectrum = () => {
 
   for (let i = 0; i < TOTAL_BARS; i++) {
     if (isPlaying) {
-      // Animate with random movement
       const target = 0.1 + Math.random() * 0.85
       spectrumBars[i] += (target - spectrumBars[i]) * 0.18
     } else {
-      // Settle to low idle
       spectrumBars[i] += (0.05 - spectrumBars[i]) * 0.08
     }
 
@@ -132,7 +186,6 @@ const drawSpectrum = () => {
     const x = i * barW + gap / 2
     const barWidth = barW - gap
 
-    // Current position indicator
     const progress = props.playerState.duration > 0
       ? props.playerState.currentTime / props.playerState.duration
       : 0
@@ -174,7 +227,59 @@ const formatTime = (seconds: number): string => {
 .player-controls {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 10px;
+}
+
+/* ---------- Control Buttons ---------- */
+.control-buttons {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+}
+
+.ctrl-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.6);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.ctrl-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+}
+
+.ctrl-btn:active {
+  transform: scale(0.9);
+}
+
+.ctrl-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.ctrl-btn-play {
+  width: 48px;
+  height: 48px;
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+}
+
+.ctrl-btn-play:hover {
+  background: rgba(255, 255, 255, 0.2);
+  transform: scale(1.05);
+}
+
+.ctrl-btn-play:active {
+  transform: scale(0.93);
 }
 
 /* ---------- Progress ---------- */
@@ -252,8 +357,34 @@ const formatTime = (seconds: number): string => {
 
 /* ---------- Mobile ---------- */
 @media (max-width: 768px) {
+  .player-controls {
+    gap: 6px;
+  }
+
+  .control-buttons {
+    gap: 18px;
+  }
+
+  .ctrl-btn {
+    width: 32px;
+    height: 32px;
+  }
+
+  .ctrl-btn-play {
+    width: 40px;
+    height: 40px;
+  }
+
   .spectrum-section {
-    height: 28px;
+    height: 24px;
+  }
+
+  .progress-section {
+    gap: 4px;
+  }
+
+  .time-label {
+    font-size: 10px;
   }
 }
 </style>

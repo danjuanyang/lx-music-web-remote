@@ -58,7 +58,7 @@ class ApiService {
   // 获取当前播放状态（增强版，支持更多信息）
   async getCurrentState(): Promise<ApiResponse<{ player: PlayerState; song: SongInfo }>> {
     try {
-      const statusResponse = await this.request('/status')
+      const statusResponse = await this.request('/status?filter=status,name,singer,albumName,duration,progress,playbackRate,picUrl')
       if (statusResponse.success) {
         const status = statusResponse.data
         console.log('LX Music状态数据:', status)
@@ -235,14 +235,9 @@ class ApiService {
     }
   }
 
-  // 跳转到指定时间 (LX Music API不支持，返回成功但不执行)
+  // 跳转到指定时间
   async seekTo(time: number): Promise<ApiResponse<void>> {
-    console.log(`进度跳转功能暂不支持: ${time}秒`)
-    return {
-      success: true,
-      data: undefined,
-      message: '进度跳转功能暂不支持'
-    }
+    return this.request(`/seek?offset=${time}`)
   }
 
   // 获取歌词

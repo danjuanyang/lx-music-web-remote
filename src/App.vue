@@ -44,6 +44,7 @@
             <SongInfoComponent
               :song-info="currentSong"
               :is-playing="playerState.isPlaying"
+              @font-changed="onFontChanged"
             />
           </div>
           <div class="left-bottom">
@@ -59,6 +60,7 @@
           <LyricsDisplay
             :lyrics="lyrics"
             :current-time="playerState.currentTime"
+            :font-family="lyricFont"
           />
         </div>
       </div>
@@ -102,9 +104,30 @@ const currentSong = reactive<SongInfoType>({
 })
 
 const lyrics = ref<LyricLine[]>([])
+const lyricFont = ref('')
 
-// Debounce timer for song-change fallback refetch
+const onFontChanged = (fontFamily: string) => {
+  lyricFont.value = fontFamily
+}
+
+// 防抖定时器：歌曲切换后延迟获取歌词和完整状态
 let songChangeTimer: number | null = null
+
+/**
+ * 安全合并歌曲信息：不用空值覆盖已有值。
+ * 例如 SSE 已经推送了 picUrl，但 HTTP /status 返回的 pic 为空，
+ * 就不应该把已有的封面覆盖掉。
+ */
+const mergeSongInfo = (source: Partial<SongInfoType>) => {
+  const keys = Object.keys(source) as (keyof SongInfoType)[]
+  for (const key of keys) {
+    const val = source[key]
+    // 只有当新值非空时才覆盖（对 string 类型，空字符串视为无效）
+    if (val !== undefined && val !== null && val !== '') {
+      ;(currentSong as any)[key] = val
+    }
+  }
+}
 
 const initializeData = async () => {
   loading.value = true
@@ -112,7 +135,7 @@ const initializeData = async () => {
     const stateResult = await apiService.getCurrentState()
     if (stateResult.success && stateResult.data) {
       Object.assign(playerState, stateResult.data.player)
-      Object.assign(currentSong, stateResult.data.song)
+      mergeSongInfo(stateResult.data.song)
     }
     const lyricsResult = await apiService.getCurrentLyrics()
     if (lyricsResult.success && lyricsResult.data && lyricsResult.data.length > 0) {
@@ -134,60 +157,61 @@ const reconnect = () => {
 }
 
 /**
- * Debounced fallback: when a song changes, SSE pushes name/singer/albumName
- * separately. We debounce these into a single refetch after all fields settle.
- * This is ONLY a fallback -- the SSE `lyric` event is the primary lyrics source.
+ * 歌曲切换后，通过 HTTP 重新拉取完整状态和歌词。
+ * 延迟执行，给 LX Music 足够时间加载新歌曲资源。
+ */
+const fetchAfterSongChange = async () => {
+  try {
+    // 拉取完整状态（包含封面 picUrl）
+    const stateResult = await apiService.getCurrentState()
+    if (stateResult.success && stateResult.data) {
+      Object.assign(playerState, stateResult.data.player)
+      mergeSongInfo(stateResult.data.song)
+    }
+
+    // 拉取完整歌词 (GET /lyric)
+    const lyricsResult = await apiService.getCurrentLyrics()
+    if (lyricsResult.success && lyricsResult.data) {
+      lyrics.value = lyricsResult.data
+    }
+  } catch (error) {
+    console.error('切歌后获取数据失败:', error)
+  }
+}
+
+/**
+ * 防抖触发 fetchAfterSongChange。
+ * SSE 切歌时 name/singer/albumName 会分别推送，
+ * 只在最后一个事件后 800ms 才真正发起 HTTP 请求。
  */
 const scheduleSongChangeRefetch = () => {
   if (songChangeTimer) clearTimeout(songChangeTimer)
-  songChangeTimer = window.setTimeout(async () => {
-    // If SSE `lyric` event already provided lyrics, skip
-    if (lyrics.value.length > 0) return
-
-    // Fallback: fetch lyrics via HTTP
-    try {
-      const result = await apiService.getCurrentLyrics()
-      if (result.success && result.data && result.data.length > 0) {
-        lyrics.value = result.data
-      }
-    } catch (error) {
-      console.error('歌词回退获取失败:', error)
-    }
-  }, 1500)
+  songChangeTimer = window.setTimeout(() => {
+    songChangeTimer = null
+    fetchAfterSongChange()
+  }, 800)
 }
 
 const setupWebSocketListeners = () => {
-  // 播放状态变化
+  // 播放状态
   on('player-state', (data: Partial<PlayerState>) => {
     Object.assign(playerState, data)
   })
 
-  // 歌曲切换 (name/singer/albumName 各自触发一次)
-  // 不在这里获取歌词，靠 SSE lyric 事件推送
-  on('song-change', (data: any) => {
-    // Map albumName -> album for our data model
-    if (data.albumName !== undefined) {
-      currentSong.album = data.albumName
-    }
-    if (data.name !== undefined) {
-      currentSong.name = data.name
-    }
-    if (data.singer !== undefined) {
-      currentSong.singer = data.singer
-    }
-
-    // Reset lyrics so "暂无歌词" shows while waiting for SSE lyric event
+  // 歌曲名变化 → 表示切了新歌
+  on('song-change', (data: { name: string }) => {
+    currentSong.name = data.name
+    // 清空当前歌词，等新歌词加载
     lyrics.value = []
-
-    // Schedule a debounced fallback refetch in case SSE lyric event doesn't arrive
+    // 防抖获取完整信息 + 歌词
     scheduleSongChangeRefetch()
   })
 
-  // 封面图更新
-  on('pic-update', (picUrl: string) => {
-    if (picUrl) {
-      currentSong.pic = picUrl
-    }
+  // 歌曲其他字段更新 (singer, albumName, picUrl)
+  on('song-field', (data: Partial<SongInfoType & { albumName?: string }>) => {
+    if (data.singer !== undefined) currentSong.singer = data.singer
+    if (data.albumName !== undefined) currentSong.album = data.albumName
+    if (data.pic !== undefined) currentSong.pic = data.pic
   })
 
   // 进度更新
@@ -199,33 +223,11 @@ const setupWebSocketListeners = () => {
       playerState.duration = data.duration
     }
   })
-
-  // 歌词更新 (SSE 推送完整歌词 -- 主要歌词来源)
-  on('lyric-update', (data: LyricLine[]) => {
-    lyrics.value = data
-    // Cancel the debounced fallback if lyrics arrived via SSE
-    if (songChangeTimer) {
-      clearTimeout(songChangeTimer)
-      songChangeTimer = null
-    }
-  })
 }
 
-// 手动切歌 (上一曲/下一曲按钮) 触发的事件
+// 手动切歌按钮触发的事件 (来自 apiService.nextSong/previousSong)
 const handleSongChange = async () => {
-  try {
-    const stateResult = await apiService.getCurrentState()
-    if (stateResult.success && stateResult.data) {
-      Object.assign(playerState, stateResult.data.player)
-      Object.assign(currentSong, stateResult.data.song)
-    }
-    const lyricsResult = await apiService.getCurrentLyrics()
-    if (lyricsResult.success && lyricsResult.data && lyricsResult.data.length > 0) {
-      lyrics.value = lyricsResult.data
-    }
-  } catch (error) {
-    console.error('歌曲切换后更新失败:', error)
-  }
+  await fetchAfterSongChange()
 }
 
 onMounted(() => {
@@ -289,7 +291,7 @@ onUnmounted(() => {
 
 /* ---------- Left panel ---------- */
 .panel-left {
-  width: 420px;
+  width: 30%;
   min-width: 360px;
   display: flex;
   flex-direction: column;
@@ -432,7 +434,7 @@ onUnmounted(() => {
   .panel-left {
     width: 100%;
     min-width: unset;
-    padding: 20px 20px 12px;
+    padding: 12px 16px 8px;
     flex: 0 0 auto;
   }
 
