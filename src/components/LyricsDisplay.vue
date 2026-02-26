@@ -12,7 +12,8 @@
         :style="getLineStyle(index)"
         @click="$emit('seekTo', line.time)"
       >
-        {{ line.text || '...' }}
+        <span class="lyric-text">{{ line.text || '...' }}</span>
+        <span v-if="line.translation" class="lyric-translation">{{ line.translation }}</span>
       </div>
 
       <div class="lyrics-spacer"></div>
@@ -176,6 +177,27 @@ onMounted(() => {
   transition: all 0.5s cubic-bezier(0.25, 0.1, 0.25, 1);
   font-weight: 500;
   will-change: filter, opacity;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.lyric-text {
+  display: block;
+}
+
+.lyric-translation {
+  display: block;
+  font-size: 14px;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.45);
+  margin-top: 4px;
+  font-weight: 400;
+}
+
+.lyric-active .lyric-translation {
+  font-size: 16px;
+  color: rgba(255, 255, 255, 0.6);
 }
 
 .lyric-line:hover {
@@ -220,6 +242,14 @@ onMounted(() => {
 
   .lyric-line.lyric-active {
     font-size: 20px;
+  }
+
+  .lyric-translation {
+    font-size: 12px;
+  }
+
+  .lyric-active .lyric-translation {
+    font-size: 13px;
   }
 
   .lyrics-spacer {

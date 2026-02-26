@@ -21,6 +21,7 @@ export interface SongInfo {
 export interface LyricLine {
   time: number
   text: string
+  translation?: string
 }
 
 // API响应接口

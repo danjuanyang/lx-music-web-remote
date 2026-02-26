@@ -240,60 +240,78 @@ class ApiService {
     return this.request(`/seek?offset=${time}`)
   }
 
-  // 获取歌词
+  // 解析LRC格式歌词文本，返回 time→text 的Map
+  private parseLrc(lrcText: string): Map<number, string> {
+    const result = new Map<number, string>()
+    if (!lrcText || typeof lrcText !== 'string') return result
+
+    const lines = lrcText.split('\n')
+    const lineRe = /^((?:\[\d{1,2}:\d{2}(?:\.\d{1,3})?\])+)(.*)/
+    const timeTagRe = /\[(\d{1,2}):(\d{2})(?:\.(\d{1,3}))?\]/g
+
+    for (const rawLine of lines) {
+      const trimmed = rawLine.trim()
+      if (!trimmed) continue
+
+      const lineMatch = trimmed.match(lineRe)
+      if (!lineMatch) continue
+
+      const timeTagStr = lineMatch[1]
+      const text = lineMatch[2].trim()
+      if (!text) continue
+
+      let tagMatch: RegExpExecArray | null
+      timeTagRe.lastIndex = 0
+      while ((tagMatch = timeTagRe.exec(timeTagStr)) !== null) {
+        const minutes = parseInt(tagMatch[1])
+        const seconds = parseInt(tagMatch[2])
+        const subStr = tagMatch[3] || '0'
+
+        let subSeconds: number
+        if (subStr.length === 3) {
+          subSeconds = parseInt(subStr) / 1000
+        } else if (subStr.length === 2) {
+          subSeconds = parseInt(subStr) / 100
+        } else {
+          subSeconds = parseInt(subStr) / 10
+        }
+
+        const time = minutes * 60 + seconds + subSeconds
+        result.set(time, text)
+      }
+    }
+
+    return result
+  }
+
+  // 获取歌词（含翻译）
   async getCurrentLyrics(): Promise<ApiResponse<LyricLine[]>> {
     try {
-      const response = await this.request('/lyric')
-      if (response.success) {
-        const lyricText = response.data
+      const response = await this.request<{ lyric: string; tlyric: string; rlyric: string; lxlyric: string }>('/lyric-all')
+      if (response.success && response.data) {
+        const data = response.data
+        const mainLrc = this.parseLrc(data.lyric)
+        const tLrc = this.parseLrc(data.tlyric || '')
+
         const lyrics: LyricLine[] = []
 
-        if (lyricText && typeof lyricText === 'string') {
-          const lines = lyricText.split('\n')
-          const lineRe = /^((?:\[\d{1,2}:\d{2}(?:\.\d{1,3})?\])+)(.*)/
-          const timeTagRe = /\[(\d{1,2}):(\d{2})(?:\.(\d{1,3}))?\]/g
-
-          for (const rawLine of lines) {
-            const trimmed = rawLine.trim()
-            if (!trimmed) continue
-
-            const lineMatch = trimmed.match(lineRe)
-            if (!lineMatch) continue
-
-            const timeTagStr = lineMatch[1]
-            const text = lineMatch[2].trim()
-            if (!text) continue
-
-            let tagMatch: RegExpExecArray | null
-            timeTagRe.lastIndex = 0
-            while ((tagMatch = timeTagRe.exec(timeTagStr)) !== null) {
-              const minutes = parseInt(tagMatch[1])
-              const seconds = parseInt(tagMatch[2])
-              const subStr = tagMatch[3] || '0'
-
-              let subSeconds: number
-              if (subStr.length === 3) {
-                subSeconds = parseInt(subStr) / 1000
-              } else if (subStr.length === 2) {
-                subSeconds = parseInt(subStr) / 100
-              } else {
-                subSeconds = parseInt(subStr) / 10
-              }
-
-              const time = minutes * 60 + seconds + subSeconds
-              lyrics.push({ time, text })
-            }
+        for (const [time, text] of mainLrc) {
+          const line: LyricLine = { time, text }
+          // 按时间匹配翻译歌词
+          if (tLrc.has(time)) {
+            line.translation = tLrc.get(time)
           }
-
-          lyrics.sort((a, b) => a.time - b.time)
+          lyrics.push(line)
         }
+
+        lyrics.sort((a, b) => a.time - b.time)
 
         return {
           success: true,
           data: lyrics
         }
       }
-      return response
+      return { success: false, data: [], message: response.message || '获取歌词失败' }
     } catch (error) {
       return {
         success: false,
