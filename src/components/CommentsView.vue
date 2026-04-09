@@ -156,7 +156,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, nextTick } from 'vue'
+import { ref, watch, onUnmounted } from 'vue'
 import { commentService, type CommentItem, type CommentSource, type SongSearchResult } from '@/services/comment'
 
 const PLATFORMS: CommentSource[] = ['kw', 'wy', 'tx', 'kg', 'mg']
@@ -222,7 +222,6 @@ async function switchPlatform(source: CommentSource) {
   if (!commentService.getPlatformSongId(source, searchResult.value)) {
     searching.value = true
     try {
-      const keyword = `${props.songName} ${props.singer}`.trim()
       // Single platform search to be faster
       const result = await commentService.searchAllPlatforms(props.songName, props.singer)
       searchResult.value = result
@@ -279,10 +278,24 @@ function hasSongId(): boolean {
   return !!commentService.getPlatformSongId(activeSource.value, searchResult.value)
 }
 
-async function openComments() {
+const handleEsc = (e: KeyboardEvent) => {
+  if (e.key === 'Escape' && showComments.value) {
+    closeComments()
+  }
+}
+
+function closeComments() {
+  showComments.value = false
+  searching.value = false
+  resetCommentState()
+  window.removeEventListener('keydown', handleEsc)
+}
+
+const openComments = async () => {
   showComments.value = true
   resetCommentState()
   showHotOnly.value = true
+  window.addEventListener('keydown', handleEsc)
   
   // Try to parse source from songId
   const parsed = props.songId ? commentService.parseLxId(props.songId) : null
@@ -368,12 +381,6 @@ const toggleReplyExpand = (commentId: string) => {
   expandedComments.value.add(commentId)
 }
 
-function closeComments() {
-  showComments.value = false
-  searching.value = false
-  resetCommentState()
-}
-
 const formatCount = (count: number): string => {
   if (count >= 10000) return `${(count / 10000).toFixed(1)}万`
   if (count >= 1000) return `${(count / 1000).toFixed(1)}k`
@@ -401,6 +408,10 @@ watch([() => props.songName, () => props.singer], () => {
     resetCommentState()
     openComments()
   }
+})
+
+onUnmounted(() => {
+  window.removeEventListener('keydown', handleEsc)
 })
 </script>
 
@@ -435,7 +446,7 @@ watch([() => props.songName, () => props.singer], () => {
   position: fixed;
   inset: 0;
   z-index: 200;
-  background: rgba(0, 0, 0, 0.7);
+  background: rgba(0, 0, 0, 0.6);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -446,13 +457,15 @@ watch([() => props.songName, () => props.singer], () => {
   width: 520px;
   height: 80vh;
   max-height: 800px;
-  background: #1a1a24;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 20px;
+  background: rgba(30, 30, 40, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 24px;
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6);
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(30px);
+  -webkit-backdrop-filter: blur(30px);
 }
 
 /* ---------- Header ---------- */
@@ -460,7 +473,7 @@ watch([() => props.songName, () => props.singer], () => {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  padding: 20px 24px 12px;
+  padding: 24px 24px 16px;
   flex-shrink: 0;
 }
 
@@ -470,7 +483,7 @@ watch([() => props.songName, () => props.singer], () => {
 }
 
 .header-title {
-  font-size: 18px;
+  font-size: 20px;
   font-weight: 600;
   color: #fff;
   margin: 0 0 4px;
@@ -489,18 +502,18 @@ watch([() => props.songName, () => props.singer], () => {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
+  width: 36px;
+  height: 36px;
   border: none;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.06);
-  color: rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.6);
   cursor: pointer;
   transition: all 0.2s;
 }
 
 .comments-close:hover {
-  background: rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.15);
   color: #fff;
 }
 
@@ -508,7 +521,7 @@ watch([() => props.songName, () => props.singer], () => {
 .platform-tabs {
   display: flex;
   gap: 8px;
-  padding: 0 24px 16px;
+  padding: 0 24px 20px;
   overflow-x: auto;
   scrollbar-width: none;
   flex-shrink: 0;
@@ -519,38 +532,39 @@ watch([() => props.songName, () => props.singer], () => {
 }
 
 .platform-tab {
-  padding: 6px 14px;
+  padding: 6px 16px;
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 100px;
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba(255, 255, 255, 0.04);
   color: rgba(255, 255, 255, 0.5);
-  font-size: 12px;
+  font-size: 13px;
   cursor: pointer;
   transition: all 0.2s;
   white-space: nowrap;
 }
 
 .platform-tab.active {
-  background: rgba(100, 140, 255, 0.15);
-  border-color: rgba(100, 140, 255, 0.3);
+  background: rgba(100, 140, 255, 0.2);
+  border-color: rgba(100, 140, 255, 0.4);
   color: #8ab4ff;
+  font-weight: 500;
 }
 
 /* ---------- Type tabs (Hot/Latest) ---------- */
 .type-tabs {
   display: flex;
-  gap: 24px;
+  gap: 28px;
   padding: 0 24px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   flex-shrink: 0;
 }
 
 .type-tab {
-  padding: 10px 0;
+  padding: 12px 0;
   border: none;
   background: none;
   color: rgba(255, 255, 255, 0.4);
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 500;
   cursor: pointer;
   position: relative;
@@ -567,9 +581,9 @@ watch([() => props.songName, () => props.singer], () => {
   bottom: 0;
   left: 0;
   right: 0;
-  height: 2px;
+  height: 3px;
   background: #8ab4ff;
-  border-radius: 2px;
+  border-radius: 3px;
 }
 
 /* ---------- Content Area ---------- */
@@ -577,6 +591,18 @@ watch([() => props.songName, () => props.singer], () => {
   flex: 1;
   overflow-y: auto;
   position: relative;
+  /* Scrollbar styling */
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.1) transparent;
+}
+
+.comments-content-area::-webkit-scrollbar {
+  width: 6px;
+}
+
+.comments-content-area::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
 }
 
 /* ---------- Loading / Error ---------- */
@@ -588,28 +614,29 @@ watch([() => props.songName, () => props.singer], () => {
   align-items: center;
   justify-content: center;
   height: 100%;
-  padding: 40px 20px;
-  gap: 16px;
+  padding: 60px 24px;
+  gap: 20px;
   color: rgba(255, 255, 255, 0.5);
   text-align: center;
 }
 
 .loading-spinner {
-  width: 32px;
-  height: 32px;
-  border: 2px solid rgba(255, 255, 255, 0.1);
-  border-top: 2px solid #8ab4ff;
+  width: 36px;
+  height: 36px;
+  border: 3px solid rgba(255, 255, 255, 0.1);
+  border-top: 3px solid #8ab4ff;
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
 
 .retry-btn {
-  padding: 8px 24px;
+  padding: 10px 28px;
   background: rgba(100, 140, 255, 0.15);
-  border: 1px solid rgba(100, 140, 255, 0.2);
-  border-radius: 12px;
+  border: 1px solid rgba(100, 140, 255, 0.25);
+  border-radius: 14px;
   color: #8ab4ff;
   font-size: 14px;
+  font-weight: 500;
   cursor: pointer;
   transition: all 0.2s;
 }
@@ -620,18 +647,18 @@ watch([() => props.songName, () => props.singer], () => {
 
 /* ---------- Comments list ---------- */
 .comments-list {
-  padding: 12px 0;
+  padding: 16px 0;
 }
 
 .comment-item {
   display: flex;
-  gap: 14px;
+  gap: 16px;
   padding: 16px 24px;
   transition: background 0.2s;
 }
 
 .comment-item:hover {
-  background: rgba(255, 255, 255, 0.02);
+  background: rgba(255, 255, 255, 0.03);
 }
 
 .comment-avatar-container {
@@ -639,15 +666,16 @@ watch([() => props.songName, () => props.singer], () => {
 }
 
 .comment-avatar {
-  width: 40px;
-  height: 40px;
+  width: 42px;
+  height: 42px;
   border-radius: 50%;
   object-fit: cover;
+  border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 .comment-avatar-placeholder {
-  width: 40px;
-  height: 40px;
+  width: 42px;
+  height: 42px;
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.08);
   display: flex;
@@ -665,13 +693,13 @@ watch([() => props.songName, () => props.singer], () => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 2px;
+  margin-bottom: 4px;
 }
 
 .comment-username {
   font-size: 14px;
-  font-weight: 500;
-  color: rgba(255, 255, 255, 0.8);
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.85);
 }
 
 .comment-likes {
@@ -679,19 +707,19 @@ watch([() => props.songName, () => props.singer], () => {
   align-items: center;
   gap: 4px;
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.3);
+  color: rgba(255, 255, 255, 0.35);
 }
 
 .comment-time {
   font-size: 12px;
   color: rgba(255, 255, 255, 0.3);
-  margin-bottom: 8px;
+  margin-bottom: 10px;
 }
 
 .comment-text {
-  font-size: 14px;
-  line-height: 1.6;
-  color: rgba(255, 255, 255, 0.85);
+  font-size: 14.5px;
+  line-height: 1.65;
+  color: rgba(255, 255, 255, 0.9);
   white-space: pre-wrap;
   word-break: break-all;
 }
@@ -700,80 +728,93 @@ watch([() => props.songName, () => props.singer], () => {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin-top: 10px;
+  margin-top: 12px;
 }
 
 .comment-img {
-  max-width: 120px;
-  max-height: 120px;
-  border-radius: 8px;
+  max-width: 140px;
+  max-height: 140px;
+  border-radius: 10px;
   object-fit: cover;
   cursor: zoom-in;
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  transition: transform 0.2s;
+}
+
+.comment-img:hover {
+  transform: scale(1.02);
 }
 
 /* ---------- Replies ---------- */
 .comment-replies {
-  margin-top: 12px;
-  background: rgba(255, 255, 255, 0.04);
-  border-radius: 12px;
-  padding: 10px 14px;
+  margin-top: 14px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 14px;
+  padding: 12px 16px;
 }
 
 .reply-item {
-  padding: 4px 0;
+  padding: 6px 0;
+}
+
+.reply-item + .reply-item {
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 .reply-username {
-  font-size: 13px;
-  font-weight: 500;
+  font-size: 13.5px;
+  font-weight: 600;
   color: #8ab4ff;
 }
 
 .reply-text {
-  font-size: 13px;
-  color: rgba(255, 255, 255, 0.75);
+  font-size: 13.5px;
+  color: rgba(255, 255, 255, 0.8);
 }
 
 .reply-meta {
-  margin-top: 2px;
+  margin-top: 4px;
 }
 
 .show-more-replies {
   background: none;
   border: none;
   color: #8ab4ff;
-  font-size: 12px;
+  font-size: 12.5px;
+  font-weight: 500;
   cursor: pointer;
-  padding: 6px 0 2px;
-  opacity: 0.8;
+  padding: 8px 0 2px;
+  opacity: 0.85;
 }
 
 .show-more-replies:hover {
   opacity: 1;
+  text-decoration: underline;
 }
 
 /* ---------- Load more ---------- */
 .load-more {
-  padding: 24px;
+  padding: 32px;
   display: flex;
   justify-content: center;
 }
 
 .load-more-btn {
-  padding: 10px 32px;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 12px 40px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
   border-radius: 100px;
-  color: rgba(255, 255, 255, 0.7);
+  color: rgba(255, 255, 255, 0.8);
   font-size: 14px;
+  font-weight: 500;
   cursor: pointer;
   transition: all 0.2s;
 }
 
 .load-more-btn:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.15);
   color: #fff;
+  border-color: rgba(255, 255, 255, 0.2);
 }
 
 .load-more-btn:disabled {
@@ -790,13 +831,13 @@ watch([() => props.songName, () => props.singer], () => {
   .comments-panel {
     width: 100%;
     height: 90vh;
-    border-radius: 20px 20px 0 0;
+    border-radius: 24px 24px 0 0;
     position: fixed;
     bottom: 0;
   }
 
   .comment-item {
-    padding: 12px 16px;
+    padding: 14px 20px;
   }
 }
 </style>

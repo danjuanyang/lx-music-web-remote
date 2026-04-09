@@ -130,6 +130,18 @@ const loadCustomFonts = async () => {
 
 const toggleFontPicker = () => {
   showFontPicker.value = !showFontPicker.value
+  if (showFontPicker.value) {
+    window.addEventListener('keydown', handleEsc)
+  } else {
+    window.removeEventListener('keydown', handleEsc)
+  }
+}
+
+const handleEsc = (e: KeyboardEvent) => {
+  if (e.key === 'Escape') {
+    showFontPicker.value = false
+    window.removeEventListener('keydown', handleEsc)
+  }
 }
 
 const selectFont = (fontValue: string) => {
@@ -137,6 +149,7 @@ const selectFont = (fontValue: string) => {
   emit('fontChanged', fontValue)
   localStorage.setItem('lx-lyric-font', fontValue)
   showFontPicker.value = false
+  window.removeEventListener('keydown', handleEsc)
 }
 
 // Cover logic
@@ -294,13 +307,15 @@ onMounted(() => {
 .font-picker {
   width: 340px;
   max-height: 480px;
-  background: rgba(28, 28, 36, 0.98);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 16px;
-  backdrop-filter: blur(20px);
+  background: rgba(32, 32, 44, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 20px;
+  backdrop-filter: blur(25px);
+  -webkit-backdrop-filter: blur(25px);
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.4);
 }
 
 .font-picker-header {
@@ -308,10 +323,10 @@ onMounted(() => {
   align-items: center;
   justify-content: space-between;
   padding: 16px 20px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-  font-size: 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 15px;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.85);
+  color: rgba(255, 255, 255, 0.9);
 }
 
 .font-picker-close {
