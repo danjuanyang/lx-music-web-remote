@@ -36,3 +36,5 @@ export interface WSMessage {
   type: 'player-state' | 'song-change' | 'lyric-update' | 'progress-update'
   data: any
 }
+
+export type CommentSource = 'kw' | 'wy' | 'tx' | 'kg' | 'mg'

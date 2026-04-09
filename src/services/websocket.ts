@@ -13,7 +13,7 @@ class SSEService {
       'status', 'name', 'singer', 'albumName',
       'duration', 'progress', 'playbackRate', 'picUrl'
     ]
-    this.url = '/api/subscribe-player-status?filter=' + fields.join(',')
+    this.url = '/lx-api/subscribe-player-status?filter=' + fields.join(',')
   }
 
   setURL(url: string) {

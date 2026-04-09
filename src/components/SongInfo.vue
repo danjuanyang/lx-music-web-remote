@@ -23,6 +23,11 @@
           <line x1="12" y1="4" x2="12" y2="20"/>
         </svg>
       </button>
+      <CommentsViewComponent
+        :song-id="songInfo.id"
+        :song-name="songInfo.name || ''"
+        :singer="songInfo.singer || ''"
+      />
     </div>
 
     <!-- Font picker dropdown -->
@@ -58,6 +63,7 @@
 import { ref, watch, onMounted } from 'vue'
 import type { SongInfo } from '@/types'
 import { coverService } from '@/services/cover'
+import CommentsViewComponent from '@/components/CommentsView.vue'
 
 interface FontOption {
   label: string

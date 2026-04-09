@@ -287,9 +287,25 @@ const handleSongChange = async () => {
   await fetchAfterSongChange()
 }
 
+const handleKeyDown = async (e: KeyboardEvent) => {
+  // 空格键切换播放/暂停，仅在非输入框元素上生效
+  if (e.code === 'Space' && e.target === document.body) {
+    e.preventDefault()
+    try {
+      const result = await apiService.togglePlayPause()
+      if (result.success) {
+        playerState.isPlaying = !playerState.isPlaying
+      }
+    } catch {
+      console.error('空格键切换播放状态失败')
+    }
+  }
+}
+
 onMounted(() => {
   setupWebSocketListeners()
   window.addEventListener('songChanged', handleSongChange)
+  window.addEventListener('keydown', handleKeyDown)
   setTimeout(() => {
     if (isConnected.value) {
       initializeData()
@@ -299,6 +315,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   window.removeEventListener('songChanged', handleSongChange)
+  window.removeEventListener('keydown', handleKeyDown)
   if (songChangeTimer) clearTimeout(songChangeTimer)
 })
 </script>

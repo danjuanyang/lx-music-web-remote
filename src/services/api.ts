@@ -5,7 +5,7 @@ class ApiService {
 
   constructor() {
     // 使用Vite代理，避免CORS问题
-    this.baseURL = '/api'
+    this.baseURL = '/lx-api'
   }
 
   // 设置API基础URL
