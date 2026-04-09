@@ -37,6 +37,7 @@ export default defineConfig({
         headers: {
           'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/60.0.3112.90 Safari/537.36',
           Referer: 'https://music.163.com/',
+          Origin: 'https://music.163.com',
         },
       },
       // 代理腾讯/QQ音乐评论和搜索API
@@ -47,6 +48,15 @@ export default defineConfig({
         headers: {
           Referer: 'https://y.qq.com/',
           Origin: 'https://y.qq.com',
+        },
+      },
+      // 代理腾讯/QQ音乐最新评论API (c.y.qq.com)
+      '/api-tx-newcomment': {
+        target: 'http://c.y.qq.com',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api-tx-newcomment/, ''),
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (compatible; MSIE 9.0; Windows NT 6.1; WOW64; Trident/5.0)',
         },
       },
       // 代理酷狗评论API（签名在客户端计算）
@@ -60,11 +70,12 @@ export default defineConfig({
       },
       // 代理咪咕评论API
       '/api-mg-comment': {
-        target: 'https://app.c.nf.migu.cn',
+        target: 'https://music.migu.cn',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api-mg-comment/, ''),
         headers: {
-          'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 13_2_3 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/13.0.3 Mobile/15E148 Safari/604.1',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/86.0.4195.1 Safari/537.36',
+          Referer: 'https://music.migu.cn',
         },
       },
       // 代理网易云搜索API
@@ -87,11 +98,11 @@ export default defineConfig({
       },
       // 代理咪咕搜索API
       '/api-mg-search': {
-        target: 'https://app.c.nf.migu.cn',
+        target: 'https://jadeite.migu.cn',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api-mg-search/, ''),
         headers: {
-          Referer: 'https://music.migu.cn/',
+          'User-Agent': 'Mozilla/5.0 (Linux; U; Android 11.0.0; zh-cn; MI 11 Build/OPR1.170623.032) AppleWebKit/534.30 (KHTML, like Gecko) Version/4.0 Mobile Safari/534.30',
         },
       },
     }

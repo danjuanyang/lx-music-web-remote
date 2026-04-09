@@ -37,7 +37,7 @@ export interface SongSearchResult {
   wy: { songId: string; name: string; singer: string } | null
   tx: { songMid: string; songId: string; name: string; singer: string } | null
   kg: { hash: string; name: string; singer: string } | null
-  mg: { copyrightId: string; name: string; singer: string } | null
+  mg: { songId: string; copyrightId: string; name: string; singer: string } | null
 }
 
 export interface PlatformCommentResult extends CommentPage {

@@ -7,10 +7,13 @@ const WY_IV = new TextEncoder().encode('0102030405060708')
 const WY_RSA_N = '00e0b509f6259df8642dbc35662901477df22677ec152b5ff68ace615bb7b725152b3ab17a876aea8a5aa76d2e417629ec4ee341f56135fccf695280104e0312ecbda92557c93870114af6c9d05c4f7f0c3685b7a46bee255932575cce10b424d813cfe4875d3e82047b97ddef52741d546b8e289dc6935b3ece0462db0a22b8e7'
 const WY_RSA_E = '010001'
 
+const WY_BASE62 = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
+
 async function weapi(object: object): Promise<{ params: string; encSecKey: string }> {
   const text = JSON.stringify(object)
-  const secretKey = new Uint8Array(16)
-  crypto.getRandomValues(secretKey)
+  const randomBuf = new Uint8Array(16)
+  crypto.getRandomValues(randomBuf)
+  const secretKey = new Uint8Array(randomBuf.map(n => WY_BASE62.charCodeAt(n % 62)))
 
   const encrypted1 = await aesEncrypt(text, WY_PRESET_KEY, WY_IV)
   const b64 = btoa(String.fromCharCode(...encrypted1))
@@ -28,9 +31,8 @@ function rsaEncrypt(hexStr: string, modulusHex: string, exponentHex: string): st
   const n = BigInt('0x' + modulusHex)
   const e = BigInt('0x' + exponentHex)
   const keyLen = 128
-  const msgLen = hexStr.length / 2
-  const paddingLen = keyLen - msgLen - 3
-  const paddedHex = '0001' + 'FF'.repeat(Math.max(paddingLen, 8)) + '00' + hexStr
+  // No padding, just zero-pad on the left (matching RSA_NO_PADDING in desktop)
+  const paddedHex = hexStr.padStart(keyLen * 2, '0')
   const msg = BigInt('0x' + paddedHex)
   const encrypted = msg ** e % n
   return encrypted.toString(16).padStart(keyLen * 2, '0')

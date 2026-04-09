@@ -37,7 +37,7 @@ class CommentService {
       case 'wy': return searchResult.wy?.songId ?? null
       case 'tx': return searchResult.tx?.songMid ?? null
       case 'kg': return searchResult.kg?.hash ?? null
-      case 'mg': return searchResult.mg?.copyrightId ?? null
+      case 'mg': return searchResult.mg?.songId ?? null
       default: return null
     }
   }

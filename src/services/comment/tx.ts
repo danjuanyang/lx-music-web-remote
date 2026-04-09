@@ -2,6 +2,7 @@ import { dateFormat2 } from './utils'
 import type { CommentPage, CommentItem } from './types'
 
 const TX_BASE = '/api-tx-comment'
+const TX_NEWCOMMENT_BASE = '/api-tx-newcomment'
 
 const TX_EMOJI: Record<string, string> = {
   e400846: '😘', e400874: '😴', e400825: '😃', e400847: '😙',
@@ -52,7 +53,7 @@ async function txGetSongId(songmid: string): Promise<string | null> {
 }
 
 export async function txSearch(keyword: string): Promise<{ songMid: string; songId: string; name: string; singer: string } | null> {
-  const body = { comm: { ct: '11', cv: '14090508', v: '14090508', tmeAppID: 'qqmusic', uin: '0' }, req: { module: 'music.search.SearchCgiService', method: 'DoSearchForQQMusicMobile', param: { search_type: 0, query: keyword, page_num: 1, num_per_page: 1, cat: 2, grp: 1 } } }
+  const body = { comm: { ct: '11', cv: '1003006', v: '1003006', os_ver: '12', phonetype: '0', devicelevel: '31', tmeAppID: 'qqmusiclight', nettype: 'NETWORK_WIFI' }, req: { module: 'music.search.SearchCgiService', method: 'DoSearchForQQMusicLite', param: { search_type: 0, query: keyword, page_num: 1, num_per_page: 1, nqc_flag: 0, grp: 1 } } }
   try {
     const resp = await fetch(`${TX_BASE}/cgi-bin/musicu.fcg`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
     if (!resp.ok) return null
@@ -67,7 +68,11 @@ export async function txGetComments(songmid: string, page: number, limit: number
   const songId = await txGetSongId(songmid)
   if (!songId) throw new Error('获取歌曲ID失败')
   const params = new URLSearchParams({ uin: '0', format: 'json', cid: '205360772', reqtype: '2', biztype: '1', topid: songId, cmd: '8', needmusiccrit: '1', pagenum: String(page - 1), pagesize: String(limit) })
-  const resp = await fetch(`${TX_BASE}/base/fcgi-bin/fcg_global_comment_h5.fcg?${params.toString()}`)
+  const resp = await fetch(`${TX_NEWCOMMENT_BASE}/base/fcgi-bin/fcg_global_comment_h5.fcg`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: params.toString(),
+  })
   if (!resp.ok) throw new Error(`Failed: ${resp.status}`)
   const data = await resp.json()
   return { total: data.comment?.commenttotal ?? 0, list: txFilterNewComment(data.comment?.commentlist ?? []) }
